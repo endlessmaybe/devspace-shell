@@ -1,0 +1,143 @@
+{
+  "packageVersion": "1.0.8",
+  "source": "https://registry.npmjs.org/@waishnav/devspace/-/devspace-1.0.8.tgz",
+  "capture": "Published registration input schemas converted with zod 4.4.3; descriptions removed. No tool handlers executed.",
+  "serverInfo": {
+    "name": "devspace",
+    "version": "0.1.0"
+  },
+  "tools": [
+    {
+      "name": "open_workspace",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "checkout",
+              "worktree"
+            ]
+          },
+          "baseRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "exec_command",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "cmd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tty": {
+            "type": "boolean"
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "workingDirectory": {
+            "type": "string"
+          },
+          "yieldTimeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30000
+          },
+          "maxOutputTokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "workspaceId",
+          "cmd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "write_stdin",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "number"
+          },
+          "chars": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "yieldTimeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30000
+          },
+          "maxOutputTokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "workspaceId",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "apply_patch",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "patch"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

@@ -19,7 +19,7 @@
 
 先用 `devspace doctor` 检查服务环境，再让 GPT 查看实际工具目录。必须由**同一连接器**提供 `open_workspace`、`exec_command`、`write_stdin`、`apply_patch` 及所需参数；插件显示名称可以任意。
 
-Shell 的兼容基线是 DevSpace **1.0.8** 的 codex 契约。1.0.8 启动服务时需要在该进程环境中设置工具模式，例如 PowerShell：
+Shell 0.1.1 适配 DevSpace **1.0.8** 的驼峰参数和 **1.1.0-beta.4** 的下划线参数；其他版本需要实际 Schema 匹配，见 [版本兼容矩阵](VERSION_COMPATIBILITY.md)。1.0.8 启动服务时需要在该进程环境中设置工具模式，例如 PowerShell：
 
 ```powershell
 $env:DEVSPACE_TOOL_MODE = 'codex'

@@ -1,0 +1,143 @@
+{
+  "packageVersion": "1.1.0-beta.4",
+  "source": "https://registry.npmjs.org/@waishnav/devspace/-/devspace-1.1.0-beta.4.tgz",
+  "capture": "Published registration input schemas converted with zod 4.4.3; descriptions removed. No tool handlers executed.",
+  "serverInfo": {
+    "name": "devspace",
+    "version": "1.1.0-beta.4"
+  },
+  "tools": [
+    {
+      "name": "open_workspace",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "checkout",
+              "worktree"
+            ]
+          },
+          "base_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "exec_command",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "cmd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tty": {
+            "type": "boolean"
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "working_directory": {
+            "type": "string"
+          },
+          "yield_time_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "workspace_id",
+          "cmd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "write_stdin",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "number"
+          },
+          "chars": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "yield_time_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "apply_patch",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "patch"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

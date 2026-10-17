@@ -1,6 +1,6 @@
 {
   "name": "devspace-shell",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Portable DevSpace task dashboard with capability-based plugin pairing",
   "homepage": "https://github.com/endlessmaybe/devspace-shell#readme",

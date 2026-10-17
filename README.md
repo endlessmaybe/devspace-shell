@@ -1,6 +1,6 @@
 # DevSpace Shell
 
-[下载安装包](https://github.com/endlessmaybe/devspace-shell/releases/latest) · [新手指南](docs/QUICKSTART.md) · [环境配置](docs/ENVIRONMENT.md) · [问题反馈](https://github.com/endlessmaybe/devspace-shell/issues) · [CI 验证](https://github.com/endlessmaybe/devspace-shell/actions/workflows/ci.yml)
+[下载安装包](https://github.com/endlessmaybe/devspace-shell/releases/latest) · [新手指南](docs/QUICKSTART.md) · [环境配置](docs/ENVIRONMENT.md) · [版本兼容](docs/VERSION_COMPATIBILITY.md) · [问题反馈](https://github.com/endlessmaybe/devspace-shell/issues) · [CI 验证](https://github.com/endlessmaybe/devspace-shell/actions/workflows/ci.yml)
 
 一个可以独立安装、自己配置的 DevSpace 工作台。把任务交给你自己的 GPT，通过你已经安装的 DevSpace 插件操作项目；任务、检查点和执行状态保存在本机。
 
@@ -8,7 +8,7 @@
 
 ## 三步开始（Windows）
 
-1. 从 [Release](https://github.com/endlessmaybe/devspace-shell/releases/latest) 下载 `devspace-shell-v0.1.0.zip`，解压到你准备长期保存的位置。也可以直接下载源码 ZIP；不要只下载一个 `.cmd` 文件。
+1. 从 [Release](https://github.com/endlessmaybe/devspace-shell/releases/latest) 下载 `devspace-shell-v0.1.1.zip`，解压到你准备长期保存的位置。也可以直接下载源码 ZIP；不要只下载一个 `.cmd` 文件。
 2. 双击 **`一键安装.cmd`**。安装器会检查 Node，缺少时下载并校验官方 Node 24.22.0；启动本机工作台并打开浏览器，默认添加**当前用户登录自启动**。不需要管理员权限、Git、npm 安装依赖或 API Key。
 3. 跟随中文向导：填写自己的项目目录 → 生成配对口令，发给已启用 DevSpace 插件的 GPT → 开始创建任务。
 
@@ -23,7 +23,7 @@
 - DevSpace 启用 **`codex` 工具模式**，提供 `open_workspace`、`exec_command`、`write_stdin`、`apply_patch`。已有插件显示名字可以任意。如果只有 `bash` / `edit` 等工具，请按 [插件配置说明](docs/PLUGIN_COMPATIBILITY.md) 调整 DevSpace 工具模式并刷新客户端目录。
 - DevSpace 的命令环境已经可用。Windows 使用 Git Bash 或配置好的 WSL2。此壳子不会迁移、覆盖或安装你的 WSL 发行版、SSH 密钥和客户端配置。
 
-尚未配置 DevSpace 的用户先按 [环境配置](docs/ENVIRONMENT.md) 准备 Node/npm、Git、Bash、自己的 DevSpace 服务与 GPT 插件授权；一键安装只负责 Shell 自身。兼容基线为 DevSpace 1.0.8 的 `codex` 工具契约；1.1 系列的工具模式改用 JSONC 配置，见该指南。
+尚未配置 DevSpace 的用户先按 [环境配置](docs/ENVIRONMENT.md) 准备 Node/npm、Git、Bash、自己的 DevSpace 服务与 GPT 插件授权；一键安装只负责 Shell 自身。Shell 0.1.1 分别适配 DevSpace **1.0.8** 的 `workspaceId/sessionId` 与 **1.1.0-beta.4** 的 `workspace_id/session_id` 契约，并保存实际参数映射；不自动升级 DevSpace。其他版本按实际 Schema 检查，不承诺全部版本通用。配置差异与旧配对升级见 [版本兼容矩阵](docs/VERSION_COMPATIBILITY.md)。
 
 GPT 的模型、订阅和权限由客户端决定。模型备注只用于展示，不会把网页 GPT 改成 API 模型；插件在线或任务领取也不代表模型版本已经核验。
 

@@ -2,12 +2,14 @@
 
 **不用统一插件名字。** 名字只作为标签，识别依赖同一连接器的工具契约。
 
-| 能力 | 工具名后缀 | 必需参数 |
-| --- | --- | --- |
-| 项目工作区 | `open_workspace` | `path: string` |
-| 启动命令 | `exec_command` | `workspaceId: string`, `cmd: string` |
-| 持续命令会话 | `write_stdin` | `workspaceId: string`, `sessionId: number/integer` |
-| 文件补丁 | `apply_patch` | `workspaceId: string`, `patch: string` |
+| 能力 | 工具名后缀 | 1.0.8 必需参数 | 1.1.0-beta.4 必需参数 |
+| --- | --- | --- | --- |
+| 项目工作区 | `open_workspace` | `path: string` | `path: string` |
+| 启动命令 | `exec_command` | `workspaceId: string`, `cmd: string` | `workspace_id: string`, `cmd: string` |
+| 持续命令会话 | `write_stdin` | `workspaceId: string`, `sessionId: number/integer` | `workspace_id: string`, `session_id: number/integer` |
+| 文件补丁 | `apply_patch` | `workspaceId: string`, `patch: string` | `workspace_id: string`, `patch: string` |
+
+完整矩阵、旧配对升级与核验范围见 [版本兼容说明](VERSION_COMPATIBILITY.md)。两个版本的参数不能混用；额外未知必填项、已声明但矛盾的输出字段也会拒绝匹配。
 
 支持未加前缀的 MCP 服务目录，也支持 `mcp__任意插件名__exec_command`、`mcp.任意名字.exec_command`、`mcp__codex_apps__自定义名_exec_command` 等客户端名称空间。参数来自工具的 `inputSchema`，必需字段的类型与 required 声明必须匹配。完整工具名、参数和指纹在本地配置保存，后续任务使用已选择的映射，不在每一轮全局枚举所有插件。
 

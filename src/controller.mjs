@@ -8,7 +8,8 @@ export class Controller {
     this.admission = new NewAppToolAdmission(store.db); this.busy = false; this.nextAttempt = 0;
   }
   readiness() {
-    return { mode: this.config.executor.mode, pluginPaired: Boolean(this.config.plugin?.pairedAt),
+    return { mode: this.config.executor.mode, pluginPaired: Boolean(this.config.plugin?.pairedAt) && this.config.plugin.compatible !== false,
+      pluginCompatibility: this.config.plugin?.compatibility || null,
       desktopBridgeAvailable: process.platform === 'win32' && candidatePipes().length > 0,
       modelLabel: this.config.modelLabel || null, modelVerified: false, admission: this.admission.status() };
   }
@@ -16,6 +17,7 @@ export class Controller {
     if (this.busy) throw new Error('派发正在进行，请稍后。');
     if (this.config.executor.mode !== 'desktop') throw new Error('当前为手动模式，请复制执行口令到已启用插件的 GPT。');
     if (!this.config.plugin?.pairedAt) throw new Error('请先完成 GPT 插件配对。');
+    if (this.config.plugin.compatible === false) throw new Error('DevSpace 工具契约不兼容，请重新配对；未派发任务。');
     if (!this.config.executor.callerThreadId || !this.config.executor.destinationThreadId) throw new Error('请先填写桌面桥接聊天配置。');
     if (this.admission.status().blocked) throw new Error('客户端请求正在冷却，请等待提示的重试时间。');
     this.busy = true;
@@ -37,7 +39,7 @@ export class Controller {
   }
   async tick() {
     this.store.expire();
-    if (!this.config.autoDispatch || this.config.executor.mode !== 'desktop' || !this.config.plugin?.pairedAt || this.busy || Date.now() < this.nextAttempt || this.admission.status().blocked) return;
+    if (!this.config.autoDispatch || this.config.executor.mode !== 'desktop' || !this.config.plugin?.pairedAt || this.config.plugin.compatible === false || this.busy || Date.now() < this.nextAttempt || this.admission.status().blocked) return;
     if (this.store.hasActiveTask()) return;
     const next = this.store.nextQueued();
     if (next) await this.dispatch(next.id).catch(() => {});

@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadConfig, appRoot, writeJson } from './config.mjs';
 import { Store, equalToken, failure } from './store.mjs';
-import { choosePlugin, discoverPlugins, probeMcp } from './plugins.mjs';
+import { choosePlugin, discoverPlugins, probeMcp, restorePair } from './plugins.mjs';
 import { pairingPrompt, taskPrompt } from './prompts.mjs';
 import { Controller } from './controller.mjs';
 
@@ -28,6 +28,7 @@ function validateWorkspace(value) {
 }
 export async function createServer({ dataDir, port = 17861, writeInstance = true, send } = {}) {
   const loaded = loadConfig(dataDir), { config } = loaded;
+  if (config.plugin?.pairedAt) { config.plugin = restorePair(config.plugin); loaded.save(); }
   const store = new Store(join(loaded.dataDir, 'tasks.sqlite'));
   let url, closing = false, interval;
   const controller = new Controller({ store, config, url: () => url, ...(send ? { send } : {}) });
@@ -52,7 +53,7 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
         const selected = store.consumeTicket(input.nonce, () => choosePlugin(input.catalog, input.selectedId));
         config.plugin = { ...selected, pairedAt: new Date().toISOString(), proof: 'command-callback', modelVerified: false };
         loaded.save();
-        return json(res, 200, { ok: true, plugin: config.plugin.label, message: '命令回连配对完成；模型身份未核验。' });
+        return json(res, 200, { ok: true, plugin: config.plugin.label, compatibility: config.plugin.compatibility, message: '工具契约与命令回连配对完成；版本声明及模型身份未核验。' });
       }
       const executor = path.match(/^\/api\/executor\/([a-f0-9-]{36})(?:\/([a-z]+))?$/);
       if (executor) {
@@ -104,7 +105,7 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
       if (taskAction) {
         const [, id, action] = taskAction;
         if (action === 'prompt') {
-          if (!config.plugin?.pairedAt) throw failure('请先在 GPT 中完成插件配对。');
+          if (!config.plugin?.pairedAt || config.plugin.compatible === false) throw failure('请先在 GPT 中重新核对版本与插件契约并完成配对。');
           return json(res, 200, { prompt: taskPrompt(config, store.get(id, true), url) });
         }
         if (action === 'dispatch') return json(res, 200, { task: await controller.dispatch(id) });
@@ -112,7 +113,7 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
       }
       const mcpAction = path.match(/^\/api\/tasks\/([a-f0-9-]{36})\/executor$/);
       if (mcpAction) {
-        if (!config.plugin?.pairedAt) throw failure('请先通过 DevSpace 插件完成配对。');
+        if (!config.plugin?.pairedAt || config.plugin.compatible === false) throw failure('请先通过 DevSpace 插件重新核对版本并完成配对。');
         const row = store.get(mcpAction[1], true), { action, commandId, ...details } = input;
         return json(res, 200, store.command(row.id, row.executor_token, commandId, action, details));
       }

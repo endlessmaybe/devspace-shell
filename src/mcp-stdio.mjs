@@ -1,6 +1,9 @@
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { dataDirectory, readJson } from './config.mjs';
+import { readFileSync } from 'node:fs';
+
+const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const string = description => ({ type: 'string', description });
 const object = (properties, required = []) => ({ type: 'object', properties, required, additionalProperties: false });
@@ -27,7 +30,7 @@ async function api(path, input) {
 }
 const actions = { devshell_claim_task: 'claim', devshell_heartbeat: 'heartbeat', devshell_activity: 'activity', devshell_checkpoint: 'checkpoint', devshell_complete_task: 'complete' };
 export async function handle(message) {
-  if (message.method === 'initialize') return { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'devspace-shell-tasks', version: '0.1.0' }, instructions: 'DevSpace Shell is the durable task controller. Coding/file/command operations require the separately paired DevSpace connector. Never infer its namespace from display name.' };
+  if (message.method === 'initialize') return { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'devspace-shell-tasks', version }, instructions: 'DevSpace Shell is the durable task controller. Coding/file/command operations require the separately paired DevSpace connector. Never infer its namespace from display name.' };
   if (message.method === 'ping') return {};
   if (message.method === 'tools/list') return { tools };
   if (message.method === 'tools/call') {
