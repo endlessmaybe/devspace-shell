@@ -27,7 +27,7 @@ export class Controller {
       row = this.store.beginDispatch(id);
       const result = await this.admission.run('dispatch', () => this.send({
         callerThreadId: this.config.executor.callerThreadId, destinationThreadId: this.config.executor.destinationThreadId,
-        prompt: taskPrompt(this.config, row, this.url()), callId: row.dispatch_id,
+        prompt: taskPrompt(this.config, row, this.url(), this.store.memory.context(row.workspace, row.request + '\n' + (row.checkpoint || ''))), callId: row.dispatch_id,
       }));
       if (result?.sent) return this.store.finishDispatch(id, 'sent');
       this.nextAttempt = Date.now() + 30_000;

@@ -67,5 +67,5 @@ test('stdio MCP is usable by a different client and prints only JSON RPC', async
   let stdout = '', stderr = ''; child.stdout.on('data', c => stdout += c); child.stderr.on('data', c => stderr += c);
   child.stdin.end([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'devshell_list_tasks', arguments: {} } }].map(JSON.stringify).join('\n') + '\n');
   const code = await new Promise(r => child.once('exit', r)); assert.equal(code, 0, stderr);
-  const messages = stdout.trim().split('\n').map(JSON.parse); assert.equal(messages.length, 3); assert.equal(messages[1].result.tools.length, 8); assert.match(messages[2].result.content[0].text, /stdio verification/);
+  const messages = stdout.trim().split('\n').map(JSON.parse); assert.equal(messages.length, 3); assert.ok(messages[1].result.tools.some(tool => tool.name === 'devshell_search_memory')); assert.ok(messages[1].result.tools.some(tool => tool.name === 'devshell_remember')); assert.match(messages[2].result.content[0].text, /stdio verification/);
 });

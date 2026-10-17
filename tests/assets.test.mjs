@@ -7,7 +7,7 @@ import { scan } from '../scripts/privacy.mjs';
 import { temp } from './helpers.mjs';
 
 test('browser application references real unique controls and ships without remote assets or inline scripts', () => {
-  const html = readFileSync(join(appRoot, 'public', 'index.html'), 'utf8'), js = readFileSync(join(appRoot, 'public', 'app.js'), 'utf8');
+  const html = readFileSync(join(appRoot, 'public', 'index.html'), 'utf8'), js = ['app.js', 'memory.js'].map(name => readFileSync(join(appRoot, 'public', name), 'utf8')).join('\n');
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]); assert.equal(new Set(ids).size, ids.length);
   for (const [, id] of js.matchAll(/\$\('([^']+)'\)/g)) assert.ok(ids.includes(id), `Missing control ${id}`);
   assert.doesNotMatch(html, /(?:src|href)="https?:\/\//); assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/); assert.doesNotMatch(html, /\bon\w+=/i);

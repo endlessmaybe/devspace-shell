@@ -8,6 +8,7 @@
     <button id="new-task" class="primary wide"><span>＋</span> 新建任务</button>
     <div class="section-label">工作空间 <span id="task-count">0</span></div>
     <nav id="task-list" aria-label="任务列表"></nav>
+    <button id="memory-button" class="quiet wide">本地记忆 · 偏好与知识</button>
     <div class="sidebar-footer"><button id="settings-button" class="quiet">⚙ 连接与设置</button><span id="version"></span></div>
   </aside>
   <main>
@@ -47,4 +48,28 @@
 <dialog id="task-dialog"><form id="task-form"><div class="dialog-title"><h2>新建任务</h2><button type="button" class="quiet close-dialog" aria-label="关闭">×</button></div><label>任务标题 <span class="muted">可选</span><input id="new-title" maxlength="120" placeholder="用几个字描述这件事"></label><label>你想完成什么<textarea id="new-request" required rows="7" maxlength="40000" placeholder="描述目标、范围和完成标准……"></textarea></label><p class="hint">任务会保存在本机。自动模式只派发到你已连接的专用隐藏会话。</p><button type="submit" class="primary wide">保存任务 <span>→</span></button></form></dialog>
 <dialog id="text-dialog"><div class="dialog-title"><h2 id="text-title">执行口令</h2><button class="quiet close-dialog" aria-label="关闭">×</button></div><p id="text-description" class="hint"></p><textarea id="text-output" readonly rows="14" aria-label="生成的内容"></textarea><div class="actions"><button id="copy-text" class="primary">复制全部内容</button><button class="secondary close-dialog">完成</button></div></dialog>
 <dialog id="confirm-dialog"><div class="dialog-title"><h2>先核实原执行器</h2></div><p id="confirm-description"></p><label class="checkbox"><input type="checkbox" id="confirm-check"> 我已停止原 GPT 执行器，并核实已发生的操作</label><div class="actions"><button id="confirm-action" class="primary">确认并继续</button><button class="secondary close-dialog">返回</button></div></dialog>
+<dialog id="memory-dialog" aria-labelledby="memory-heading">
+  <div class="dialog-title"><h2 id="memory-heading">本地记忆</h2><button class="quiet close-dialog" aria-label="关闭">×</button></div>
+  <p class="hint">属于这份安装的独立记忆库。任务会检索当前项目的知识与显式保存的用户偏好，并将选中的内容发送给执行 GPT。这里的开关不更改 ChatGPT 账号记忆设置。</p>
+  <div id="memory-message" class="warning" role="status" hidden></div>
+  <details><summary>记忆设置</summary><form id="memory-policy-form">
+    <label class="checkbox"><input id="memory-enabled" type="checkbox">启用本地记忆检索及执行器写入</label>
+    <label class="checkbox"><input id="memory-auto" type="checkbox">自动记录检查点和完成结果</label>
+    <label>每个项目保留的自动任务记录<input id="memory-limit" type="number" min="1" max="1000" required></label>
+    <p class="hint">默认 200 条。手动记忆和固定记录不自动裁剪；关闭记忆会保留已有记录，可继续在这里管理。</p>
+    <button class="secondary" type="submit">保存设置</button>
+  </form></details>
+  <div class="form-grid memory-toolbar"><label>查看范围<select id="memory-scope"><option value="project">当前项目</option><option value="user">用户偏好 · 所有项目</option></select></label><form id="memory-search-form"><label>搜索<input id="memory-query" maxlength="4000" placeholder="中文或英文关键词"></label><button class="secondary" type="submit">搜索</button></form></div>
+  <p id="memory-workspace" class="path"></p>
+  <div class="actions"><button id="memory-new" class="primary">新增记忆</button><button id="memory-export" class="quiet">导出当前范围</button><button id="memory-clear" class="quiet danger">清空当前范围</button></div>
+  <div id="memory-confirm" class="warning" hidden><p id="memory-confirm-text"></p><div class="actions"><button id="memory-confirm-yes" class="secondary danger">确认删除</button><button id="memory-confirm-no" class="quiet">保留</button></div></div>
+  <form id="memory-edit-form" class="card" hidden>
+    <h3 id="memory-edit-heading">新增记忆</h3><label>类型<select id="memory-kind"><option value="knowledge">项目知识</option><option value="preference">偏好</option></select></label>
+    <label>标题<input id="memory-title" maxlength="120" required></label><label>内容<textarea id="memory-content" rows="6" maxlength="12000" required placeholder="记录事实、适用条件与依据；请勿保存密码、令牌和私密聊天。"></textarea></label>
+    <label class="checkbox"><input id="memory-pinned" type="checkbox">固定：优先提供给后续任务，自动任务记录不再覆盖此条</label>
+    <div class="actions"><button class="primary" type="submit">保存记忆</button><button id="memory-edit-cancel" class="quiet" type="button">取消编辑</button></div>
+  </form>
+  <p id="memory-count" class="hint"></p><div id="memory-list"></div>
+  <div class="actions"><button id="memory-previous" class="quiet">上一页</button><button id="memory-next" class="quiet">下一页</button></div>
+</dialog>
 </body></html>

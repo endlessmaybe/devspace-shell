@@ -11,7 +11,7 @@ function fixture(t) {
   const row = store.create({ request: '修复示例项目并验证', workspace: '/example/project' }), token = store.get(row.id, true).executor_token;
   return { store, row, token, path, advance: n => { clock += n; } };
 }
-test('fresh database contains no prior tasks or memory', t => { const { store } = fixture(t); assert.equal(store.list().length, 1); assert.equal(store.list()[0].state, 'queued'); });
+test('fresh database contains no prior tasks or memory', t => { const { store } = fixture(t); assert.equal(store.list().length, 1); assert.equal(store.list()[0].state, 'queued'); assert.equal(store.db.prepare('SELECT count(*) AS n FROM memories').get().n, 0); });
 test('lease claim is idempotent for a stable command id', t => {
   const { store, row, token } = fixture(t); const first = store.command(row.id, token, 'claim', 'claim', {});
   assert.deepEqual(store.command(row.id, token, 'claim', 'claim', {}), first); assert.equal(first.last_progress, null);

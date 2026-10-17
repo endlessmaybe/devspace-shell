@@ -17,9 +17,10 @@ export async function run(args = process.argv.slice(2), { environment = process.
     endpoint = '/api/desktop/bootstrap'; input = { nonce: ticket.nonce, callerThreadId };
   } else if (positionals[0] === 'task' && /^[a-f0-9-]{36}$/.test(ticket.taskId)) {
     const action = values.action || 'get';
-    if (!['get', 'claim', 'heartbeat', 'activity', 'checkpoint', 'complete'].includes(action)) throw new Error('不支持的任务动作。');
+    if (!['get', 'memory', 'remember', 'claim', 'heartbeat', 'activity', 'checkpoint', 'complete'].includes(action)) throw new Error('不支持的任务动作。');
     endpoint = `/api/executor/${ticket.taskId}${action === 'get' ? '' : '/' + action}`;
-    input = action === 'get' ? null : JSON.parse(values.body || '{}'); token = ticket.token;
+    input = ['get', 'memory'].includes(action) ? null : JSON.parse(values.body || '{}'); token = ticket.token;
+    if (action === 'memory' && values.body) endpoint += '?' + new URLSearchParams({ q: JSON.parse(values.body).query || '' });
   } else throw new Error('用法：client.mjs pair|desktop-connect|task --ticket <口令> ...');
   const response = await fetch(new URL(endpoint, url), { method: input ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(input ? { body: JSON.stringify(input) } : {}) });
   const result = await response.json(); if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);

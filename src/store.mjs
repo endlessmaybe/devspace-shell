@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
+import { MemoryStore } from './memory.mjs';
 
 export function failure(message, status = 409) { const error = new Error(message); error.status = status; return error; }
 export function equalToken(a, b) {
@@ -21,6 +22,7 @@ export class Store {
     if (!this.db.prepare('PRAGMA table_info(tickets)').all().some(column => column.name === 'purpose')) {
       this.db.exec("ALTER TABLE tickets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'pair'");
     }
+    this.memory = new MemoryStore(this.db, { now });
     // A crash after marking 'sending' may have delivered the message. Preserve uncertainty.
     this.db.prepare("UPDATE tasks SET state='delivery_unknown',dispatch_state='unknown' WHERE dispatch_state='sending' AND state='dispatching'").run();
   }
@@ -80,7 +82,7 @@ export class Store {
       const digest = createHash('sha256').update(JSON.stringify({ kind, body })).digest('hex');
       const previous = this.db.prepare('SELECT * FROM commands WHERE task_id=? AND command_id=?').get(id, commandId);
       if (previous) { if (previous.digest !== digest) throw failure('同一 commandId 的内容不能改变。'); return JSON.parse(previous.result); }
-      const now = this.now();
+      const now = this.now(); let memory;
       if (kind === 'claim') {
         if (!['queued', 'waiting_executor', 'delivery_unknown', 'dispatching'].includes(row.state)) throw failure('任务已经领取或暂停，需明确恢复。');
         const other = this.db.prepare("SELECT id FROM tasks WHERE id<>? AND state IN ('running','lease_expired','paused','dispatching','waiting_executor','delivery_unknown') LIMIT 1").get(id);
@@ -94,6 +96,10 @@ export class Store {
           if (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 32000) throw failure('进展内容不能为空或超过 32000 字符。', 400);
           this.db.prepare(`UPDATE tasks SET ${kind === 'checkpoint' ? 'checkpoint=?,' : ''} last_progress=?,lease_until=?,updated_at=? WHERE id=?`).run(...(kind === 'checkpoint' ? [body.text] : []), now, now + this.leaseMs, now, id);
           this.event(id, kind, body.text);
+        } else if (kind === 'remember') {
+          if (!this.memory.policy().enabled) throw failure('本地记忆已关闭。');
+          if ((body.scope && body.scope !== 'project') || (body.workspace && body.workspace !== row.workspace) || body.id) throw failure('执行器只能新增当前任务的项目记忆。', 403);
+          memory = this.memory.put({ scope: 'project', workspace: row.workspace, kind: body.kind || 'knowledge', title: body.title, content: body.content }, { source: 'executor', sourceTask: id });
         } else if (kind === 'complete') {
           if (typeof body.result !== 'string' || !body.result.trim() || body.result.length > 32000 || !Array.isArray(body.evidence) || !body.evidence.length || body.evidence.length > 40 || body.evidence.some(v => typeof v !== 'string' || !v.trim() || v.length > 2000)) throw failure('完成需要结果说明和至少一条真实验证证据。', 400);
           this.db.prepare("UPDATE tasks SET state='completed',result=?,lease_until=NULL,updated_at=? WHERE id=?").run(JSON.stringify({ text: body.result, evidence: body.evidence }), now, id);
@@ -101,6 +107,8 @@ export class Store {
         } else throw failure('未知执行器操作。', 400);
       }
       const result = this.get(id);
+      if (kind === 'checkpoint' || kind === 'complete') this.memory.capture(result);
+      if (memory) result.memory = memory;
       this.db.prepare('INSERT INTO commands(task_id,command_id,digest,result) VALUES(?,?,?,?)').run(id, commandId, digest, JSON.stringify(result));
       return result;
     });

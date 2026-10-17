@@ -18,6 +18,7 @@ function extract(bytes) {
 test('release contains Chinese launchers and source, excludes every runtime identity and data category', () => {
   assert.deepEqual(privacy(), []); const destination = temp('release'), result = packageRelease(destination), files = extract(readFileSync(result.archive));
   assert.ok(files.has('devspace-shell/一键安装.cmd')); assert.ok(files.has('devspace-shell/src/server.mjs')); assert.ok(files.has('devspace-shell/scripts/install.ps1'));
+  assert.ok(files.has('devspace-shell/src/memory.mjs')); assert.ok(files.has('devspace-shell/public/memory.js')); assert.ok(files.has('devspace-shell/docs/LOCAL_MEMORY.md'));
   for (const name of files.keys()) assert.doesNotMatch(name, /\/(?:\.runtime|\.git|node_modules|thread-memory|logs|state|conversations)\/|\.sqlite|\/config\.json/);
   assert.equal(JSON.parse(readFileSync(join(destination, 'manifest.json'))).files.length, files.size);
 });

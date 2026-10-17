@@ -12,7 +12,7 @@ import { Controller } from './controller.mjs';
 import { listHiddenExecutors, verifyHiddenExecutor } from './adapters/desktop-pipe.mjs';
 
 const version = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version;
-const staticFiles = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/favicon.svg', ['favicon.svg', 'image/svg+xml']]]);
+const staticFiles = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/memory.js', ['memory.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/favicon.svg', ['favicon.svg', 'image/svg+xml']]]);
 function publicConfig(config) {
   const { adminToken, installationId, executor, ...safe } = config;
   return { ...safe, executor: { mode: executor.mode, bound: Boolean(executor.callerThreadId && executor.destinationThreadId),
@@ -33,6 +33,11 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
   const loaded = loadConfig(dataDir), { config } = loaded;
   if (config.plugin?.pairedAt) { config.plugin = restorePair(config.plugin); loaded.save(); }
   const store = new Store(join(loaded.dataDir, 'tasks.sqlite'));
+  const taskData = id => {
+    const task = store.get(id);
+    return { task, events: store.events(id), memory: store.memory.context(task.workspace, task.request + '\n' + (task.checkpoint || '')) };
+  };
+  const memoryInput = input => ({ ...input, workspace: input.workspace || config.workspace });
   let url, closing = false, interval;
   const controller = new Controller({ store, config, url: () => url, ...(send ? { send } : {}) });
   const callerContext = () => config.executor.callerThreadId || String(environment.CODEX_THREAD_ID || '').trim();
@@ -74,7 +79,11 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
       if (executor) {
         const [, id, action] = executor;
         store.authorize(id, token);
-        if (req.method === 'GET' && !action) return json(res, 200, { task: store.get(id), events: store.events(id) });
+        if (req.method === 'GET' && !action) return json(res, 200, taskData(id));
+        if (req.method === 'GET' && action === 'memory') {
+          const task = store.get(id);
+          return json(res, 200, store.memory.context(task.workspace, target.searchParams.get('q') || task.request));
+        }
         if (req.method !== 'POST' || !action) throw failure('请求方法不支持。', 405);
         const input = await body(req), { commandId, ...details } = input;
         return json(res, 200, store.command(id, token, commandId, action, details));
@@ -82,11 +91,18 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
       if (!equalToken(token, config.adminToken)) throw failure('请从启动器打开控制台以完成本机认证。', 401);
       if (req.method === 'GET' && path === '/api/status') return json(res, 200, { version, config: publicConfig(config), readiness: controller.readiness(), dataDir: loaded.dataDir, tasks: store.list() });
       if (req.method === 'GET' && path === '/api/config/client') return json(res, 200, { mcpServers: { 'devspace-shell-tasks': { command: process.execPath, args: [join(appRoot, 'src', 'mcp-stdio.mjs')], env: { DEVSPACE_SHELL_DATA: loaded.dataDir } } } });
+      if (req.method === 'GET' && path === '/api/memory/settings') return json(res, 200, store.memory.policy());
       if (req.method === 'GET' && path.startsWith('/api/tasks/')) {
-        const id = path.slice('/api/tasks/'.length); return json(res, 200, { task: store.get(id), events: store.events(id) });
+        const id = path.slice('/api/tasks/'.length); return json(res, 200, taskData(id));
       }
       if (req.method !== 'POST') throw failure('入口不存在。', 404);
       const input = await body(req);
+      if (path === '/api/memory/search') return json(res, 200, store.memory.search(memoryInput(input)));
+      if (path === '/api/memory/context') return json(res, 200, store.memory.context(input.workspace || config.workspace, input.query || ''));
+      if (path === '/api/memory/save') return json(res, 200, { note: store.memory.put(memoryInput(input), { source: 'user' }) });
+      if (path === '/api/memory/delete') return json(res, 200, store.memory.remove(input.id, input.revision));
+      if (path === '/api/memory/clear') return json(res, 200, store.memory.clear(memoryInput(input)));
+      if (path === '/api/memory/settings') return json(res, 200, store.memory.policy(input));
       if (path === '/api/desktop/ticket') {
         idleSettings();
         return json(res, 200, { prompt: desktopConnectPrompt(config, url, store.ticket('desktop')), expiresInSeconds: 600 });
@@ -145,7 +161,8 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
         const [, id, action] = taskAction;
         if (action === 'prompt') {
           if (!config.plugin?.pairedAt || config.plugin.compatible === false) throw failure('请先在 GPT 中重新核对版本与插件契约并完成配对。');
-          return json(res, 200, { prompt: taskPrompt(config, store.get(id, true), url) });
+          const row = store.get(id, true);
+          return json(res, 200, { prompt: taskPrompt(config, row, url, store.memory.context(row.workspace, row.request + '\n' + (row.checkpoint || ''))) });
         }
         if (action === 'dispatch') return json(res, 200, { task: await controller.dispatch(id) });
         return json(res, 200, { task: store.action(id, input.action, input.acknowledged === true) });

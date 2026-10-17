@@ -1,3 +1,4 @@
+import { setupMemory } from './memory.js';
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.hash.slice(1));
 if (params.has('token')) { sessionStorage.setItem('devshell-token', params.get('token')); history.replaceState(null, '', location.pathname); }
@@ -137,5 +138,6 @@ $('task-pause').addEventListener('click', safe(async () => { await api(`/api/tas
 for (const [id, action] of [['task-resume', 'resume'], ['task-reconcile', 'confirm-not-delivered'], ['task-cancel', 'cancel']]) $(id).addEventListener('click', () => { confirmAction = action; $('confirm-check').checked = false; $('confirm-description').textContent = '继续前请查看原 GPT 聊天，核实命令是否已执行，避免重复修改。检查点会保留。'; $('confirm-dialog').showModal(); });
 $('confirm-action').addEventListener('click', safe(async () => { if (!$('confirm-check').checked) throw new Error('请先核实并勾选确认。'); await api(`/api/tasks/${selectedId}/action`, { action: confirmAction, acknowledged: true }); $('confirm-dialog').close(); await refresh(); }));
 $('copy-text').addEventListener('click', safe(async () => { try { await navigator.clipboard.writeText($('text-output').value); $('copy-text').textContent = '已复制'; setTimeout(() => $('copy-text').textContent = '复制全部内容', 1500); } catch { $('text-output').select(); throw new Error('浏览器未允许自动复制，内容已选中，请按 Ctrl+C。'); } }));
+setupMemory({ api, node, getWorkspace: () => state?.config.workspace || '' });
 for (const button of document.querySelectorAll('.close-dialog')) button.addEventListener('click', () => button.closest('dialog').close());
 await refresh(true); setInterval(() => refresh(), 4000);
