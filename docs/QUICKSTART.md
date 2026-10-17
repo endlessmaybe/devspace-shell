@@ -1,5 +1,7 @@
 # 第一次使用
 
+下载入口：[GitHub Release](https://github.com/endlessmaybe/devspace-shell/releases/latest)。还没有自己的 DevSpace 服务或插件时，先看 [环境配置](ENVIRONMENT.md)。
+
 ## 安装工作台
 
 把完整 ZIP 解压到固定文件夹，双击「一键安装.cmd」。没有 Node 时自动下载官方运行时、核对固定 SHA-256；出现下载失败可稍后再点一次，不会改系统 PATH 或要求管理员权限。应用没有 npm 运行依赖。
