@@ -25,7 +25,7 @@ export function loadConfig(dataDir = dataDirectory()) {
   const value = readJson(path) || {
     version: 1, installationId: randomBytes(16).toString('hex'),
     adminToken: randomBytes(32).toString('base64url'),
-    workspace: '', commandRuntime: 'native', executor: { mode: 'manual', callerThreadId: '', destinationThreadId: '' },
+    workspace: '', commandRuntime: 'native', executor: { mode: 'manual' },
     plugin: null, modelLabel: '', autoDispatch: false,
   };
   if (value.version !== 1 || !value.adminToken || !value.installationId) throw new Error('配置格式无效，请保留数据并查看故障排查说明。');

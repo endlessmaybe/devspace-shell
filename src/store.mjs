@@ -18,6 +18,9 @@ export class Store {
       CREATE TABLE IF NOT EXISTS commands(task_id TEXT NOT NULL, command_id TEXT NOT NULL, digest TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(task_id,command_id));
       CREATE TABLE IF NOT EXISTS tickets(nonce TEXT PRIMARY KEY, expires_at INTEGER NOT NULL, consumed INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
+    if (!this.db.prepare('PRAGMA table_info(tickets)').all().some(column => column.name === 'purpose')) {
+      this.db.exec("ALTER TABLE tickets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'pair'");
+    }
     // A crash after marking 'sending' may have delivered the message. Preserve uncertainty.
     this.db.prepare("UPDATE tasks SET state='delivery_unknown',dispatch_state='unknown' WHERE dispatch_state='sending' AND state='dispatching'").run();
   }
@@ -123,16 +126,16 @@ export class Store {
       return this.get(id);
     });
   }
-  ticket() {
+  ticket(purpose = 'pair') {
     const nonce = randomBytes(32).toString('base64url');
-    this.db.prepare('DELETE FROM tickets').run();
-    this.db.prepare('INSERT INTO tickets(nonce,expires_at) VALUES(?,?)').run(nonce, this.now() + 10 * 60_000);
+    this.db.prepare('DELETE FROM tickets WHERE purpose=? OR expires_at<?').run(purpose, this.now());
+    this.db.prepare('INSERT INTO tickets(nonce,expires_at,purpose) VALUES(?,?,?)').run(nonce, this.now() + 10 * 60_000, purpose);
     return nonce;
   }
-  consumeTicket(nonce, operation) {
+  consumeTicket(nonce, operation, purpose = 'pair') {
     return this.transaction(() => {
       const ticket = this.db.prepare('SELECT * FROM tickets WHERE nonce=?').get(String(nonce));
-      if (!ticket || ticket.consumed || ticket.expires_at < this.now()) throw failure('配对口令已过期或已使用，请重新生成。', 401);
+      if (!ticket || ticket.purpose !== purpose || ticket.consumed || ticket.expires_at < this.now()) throw failure('连接口令用途不符、已过期或已使用，请重新生成。', 401);
       const result = operation();
       this.db.prepare('UPDATE tickets SET consumed=1 WHERE nonce=?').run(nonce); return result;
     });

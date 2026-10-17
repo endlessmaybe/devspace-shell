@@ -104,7 +104,7 @@ function toolText(result) {
 async function appToolRequest(request, callerThreadId, tool, args, callId = randomUUID()) {
   if (!localTools.has(tool)) throw new Error('App tool is not registered in the local recovery catalog');
   try { return await request('tools/call', {
-    namespace: localCatalog.namespace, tool, arguments: args, callerSource: 'codex',
+    namespace: localCatalog.namespace, tool, arguments: args, callerSource: 'codex', hostId: 'local',
     threadId: callerThreadId,
     turnId: `devspace-background-${Date.now().toString(36)}`,
     callId,
@@ -142,6 +142,51 @@ export function candidatePipes({ environment = process.env, readPipes = () => re
     }
   } catch {}
   return [...new Set(paths)];
+}
+
+export async function listHiddenExecutors({ callerThreadId, cursor }, {
+  discoverPipes = candidatePipes, withPipe = withNativePipe,
+} = {}) {
+  if (!callerThreadId) throw new Error('Missing background caller context');
+  const failures = [];
+  for (const pipePath of [...new Set(discoverPipes())]) {
+    try {
+      return await withPipe(pipePath, async request => {
+        const listing = await appToolJsonRequest(request, callerThreadId, 'list_archived_threads', {
+          source: 'chatgpt', limit: 50, ...(cursor ? { cursor } : {}),
+        });
+        if (!Array.isArray(listing?.threads)) throw new Error('Codex app archive listing is invalid');
+        const next = listing.nextCursor;
+        if (next != null && next !== '' && (typeof next !== 'string' || !next.trim() || next === cursor)) {
+          throw new Error('Codex app archive pagination cursor is invalid or repeated');
+        }
+        // Never return previews, retrieval summaries or transcript content to
+        // setup. A title is untrusted display data, never an auto-bind signal.
+        return { threads: listing.threads.filter(t => t?.kind === 'chatgpt' && typeof t.id === 'string' && t.id.trim()).map(t => ({
+          id: t.id, title: String(t.title || '未命名隐藏会话').slice(0, 200), updatedAt: t.updatedAt ?? null,
+        })), nextCursor: next || null };
+      });
+    } catch (error) {
+      if (isAppToolRateLimit(error)) throw error;
+      failures.push(error.message);
+    }
+  }
+  throw new Error(failures.join('; ') || '桌面桥接不可用，请打开兼容客户端后重试。');
+}
+
+export async function verifyHiddenExecutor({ callerThreadId, destinationThreadId }, dependencies = {}) {
+  if (!destinationThreadId) throw new Error('请先选择专用隐藏会话。');
+  let cursor, selected;
+  const seen = new Set();
+  for (let page = 0; page < 1000; page++) {
+    const listing = await listHiddenExecutors({ callerThreadId, cursor }, dependencies);
+    selected = listing.threads.find(t => t.id === destinationThreadId);
+    if (selected) return selected;
+    if (!listing.nextCursor) break;
+    if (seen.has(listing.nextCursor)) throw new Error('Codex app archive pagination cursor is repeated');
+    seen.add(listing.nextCursor); cursor = listing.nextCursor;
+  }
+  throw new Error('所选 GPT 会话不在隐藏归档列表中，请先归档专用会话再连接。');
 }
 
 export async function sendArchivedChatgptMessage({ callerThreadId, destinationThreadId, prompt, callId = randomUUID() }, {

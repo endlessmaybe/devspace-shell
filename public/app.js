@@ -2,6 +2,8 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.hash.slice(1));
 if (params.has('token')) { sessionStorage.setItem('devshell-token', params.get('token')); history.replaceState(null, '', location.pathname); }
 let state, selectedId = null, editing = false, confirmAction = null, fetching = false;
+let hiddenCursor = null, hiddenLoading = false;
+const hiddenChoices = new Map(), hiddenCursors = new Set();
 const labels = { queued: '等待执行', dispatching: '正在派发', waiting_executor: '等待 GPT 领取', running: '运行中 · RUNNING', paused: '已暂停', lease_expired: '租约过期', delivery_unknown: '发送结果未知', completed: '已完成', cancelled: '已取消' };
 function notice(error) { $('notice').textContent = error?.message || String(error); $('notice').hidden = false; }
 async function api(path, input) {
@@ -20,19 +22,21 @@ function showSetup(show) {
 function fillSettings() {
   const c = state.config;
   $('workspace').value = c.workspace; $('command-runtime').value = c.commandRuntime; $('executor-mode').value = c.executor.mode;
-  $('model-label').value = c.modelLabel; $('caller-id').value = c.executor.callerThreadId; $('destination-id').value = c.executor.destinationThreadId;
+  $('model-label').value = c.modelLabel;
   $('auto-dispatch').checked = c.autoDispatch; $('desktop-fields').hidden = c.executor.mode !== 'desktop';
+  hiddenChoices.clear(); hiddenCursors.clear(); hiddenCursor = null; $('hidden-picker').hidden = true;
 }
 function render() {
   const c = state.config, paired = Boolean(c.plugin?.pairedAt) && c.plugin.compatible !== false;
   $('version').textContent = `v${state.version}`; $('task-count').textContent = state.tasks.length;
   $('pair-state').textContent = paired ? '已配对' : '尚未配对'; $('pair-state').className = `badge${paired ? ' paired' : ''}`;
-  $('ready-note').textContent = paired ? `已识别 ${c.plugin.label}。命令回连成功；模型身份由客户端负责。` : '完成设置和 GPT 插件配对后，即可提交第一个任务。';
+  $('ready-note').textContent = c.executor.mode === 'desktop' && !c.executor.bound ? '请先识别并连接专用隐藏会话，然后在该会话完成插件配对。' : paired ? `已识别 ${c.plugin.label}。命令回连成功；模型身份由客户端负责。` : '完成设置和 GPT 插件配对后，即可提交第一个任务。';
   $('plugin-label').textContent = c.plugin?.label || '尚未配对';
   $('compatibility-note').textContent = c.plugin?.compatibility?.message || '支持 1.0.8 驼峰与 1.1 预览版下划线工具契约；版本未知时按实际参数核对，不自动升级 DevSpace。';
-  $('executor-note').textContent = c.executor.mode === 'manual' ? '通用模式 · 复制口令到 GPT' : state.readiness.desktopBridgeAvailable ? '桌面桥接可用 · 等待任务' : '桌面桥接未就绪 · 请打开兼容客户端';
+  $('hidden-connection').textContent = c.executor.bound ? `已连接：${c.executor.title}。重启后继续复用。` : '尚未连接。先保存执行方式，再点击“识别隐藏会话”。';
+  $('executor-note').textContent = c.executor.mode === 'manual' ? '通用模式 · 复制口令到 GPT' : !c.executor.bound ? '等待连接专用隐藏会话' : state.readiness.desktopBridgeAvailable ? `隐藏会话 · ${c.executor.title}` : '桌面桥接未就绪 · 请打开兼容客户端';
   $('model-note').textContent = c.modelLabel || '由客户端选择';
-  $('begin-button').disabled = !c.workspace || !paired;
+  $('begin-button').disabled = !c.workspace || !paired || (c.executor.mode === 'desktop' && !c.executor.bound);
   $('task-list').replaceChildren();
   if (!state.tasks.length) $('task-list').append(node('p', '这里会保存你自己的任务。', 'hint'));
   for (const task of state.tasks) {
@@ -62,20 +66,60 @@ async function refresh(first = false) {
   if (fetching) return; fetching = true;
   try {
     state = await api('/api/status'); $('auth-view').hidden = true; $('service-status').textContent = '本机服务在线'; $('service-dot').className = 'dot';
-    if (first) { fillSettings(); selectedId = state.tasks[0]?.id || null; showSetup(!state.config.workspace || !state.config.plugin?.pairedAt || state.config.plugin.compatible === false); }
+    if (first) { fillSettings(); selectedId = state.tasks[0]?.id || null; showSetup(!state.config.workspace || !state.config.plugin?.pairedAt || state.config.plugin.compatible === false || (state.config.executor.mode === 'desktop' && !state.config.executor.bound)); }
     render(); await detail();
   } catch (error) { $('service-status').textContent = '连接中断'; $('service-dot').className = 'dot offline'; if (first) notice(error); }
   finally { fetching = false; }
 }
 $('setup-form').addEventListener('submit', safe(async () => {
   await api('/api/setup', { workspace: $('workspace').value.trim(), commandRuntime: $('command-runtime').value, modelLabel: $('model-label').value, autoDispatch: $('auto-dispatch').checked,
-    executor: { mode: $('executor-mode').value, callerThreadId: $('caller-id').value, destinationThreadId: $('destination-id').value } }); await refresh();
-  $('notice').hidden = false; $('notice').textContent = '设置已保存。接下来完成 GPT 插件配对。';
+    executor: { mode: $('executor-mode').value } }); await refresh();
+  $('notice').hidden = false; $('notice').textContent = state.config.executor.mode === 'desktop' && !state.config.executor.bound ? '设置已保存。接下来点击“识别隐藏会话”。' : state.config.plugin?.pairedAt ? '设置已保存。' : '设置已保存。接下来完成 GPT 插件配对。';
 }));
 $('executor-mode').addEventListener('change', () => { $('desktop-fields').hidden = $('executor-mode').value !== 'desktop'; if ($('executor-mode').value === 'manual') $('auto-dispatch').checked = false; });
+async function desktopBootstrap() {
+  const result = await api('/api/desktop/ticket', {});
+  showText('首次桌面连接 · 自动获取上下文', result.prompt, '把口令发给兼容 Codex 桌面客户端，让它执行一次本地连接命令。无需手填 ID；不会向 GPT 发送任务。完成后回到这里点击“识别隐藏会话”。');
+}
+async function findHidden(more = false) {
+  if (hiddenLoading) return;
+  if (state.config.executor.mode !== 'desktop') throw new Error('请先保存“桌面隐藏会话”执行方式。');
+  hiddenLoading = true; $('find-hidden').disabled = true; $('more-hidden').disabled = true; $('bind-hidden').disabled = true;
+  try {
+    const result = await api('/api/desktop/list', more && hiddenCursor ? { cursor: hiddenCursor } : {});
+    if (result.needsBootstrap) { await desktopBootstrap(); return; }
+    const previous = $('hidden-choice').value;
+    if (!more) { hiddenChoices.clear(); hiddenCursors.clear(); }
+    if (result.nextCursor && hiddenCursors.has(result.nextCursor)) throw new Error('客户端返回重复翻页，请重新识别隐藏会话。');
+    if (result.nextCursor) hiddenCursors.add(result.nextCursor);
+    for (const choice of result.threads) hiddenChoices.set(choice.id, choice);
+    hiddenCursor = result.nextCursor; $('hidden-choice').replaceChildren(node('option', '请选择专用会话'));
+    $('hidden-choice').firstElementChild.value = '';
+    for (const choice of hiddenChoices.values()) {
+      const option = node('option', choice.title); option.value = choice.id; $('hidden-choice').append(option);
+    }
+    // Even one result may be a personal chat. Never bind it automatically.
+    if (more && hiddenChoices.has(previous)) $('hidden-choice').value = previous;
+    $('hidden-picker').hidden = false; $('more-hidden').hidden = !hiddenCursor;
+    if (!hiddenChoices.size) notice('没有发现隐藏归档的 GPT 会话。请先在客户端准备专用会话并归档，再重新识别。');
+  } finally { hiddenLoading = false; $('find-hidden').disabled = false; $('more-hidden').disabled = false; $('bind-hidden').disabled = false; }
+}
+$('find-hidden').addEventListener('click', safe(() => findHidden()));
+$('more-hidden').addEventListener('click', safe(() => findHidden(true)));
+$('desktop-bootstrap').addEventListener('click', safe(desktopBootstrap));
+$('bind-hidden').addEventListener('click', safe(async () => {
+  if (hiddenLoading) return;
+  const selection = $('hidden-choice').value;
+  if (!hiddenChoices.has(selection)) throw new Error('请选择你专门准备的隐藏执行会话。');
+  $('bind-hidden').disabled = true;
+  try {
+    const result = await api('/api/desktop/connect', { selection }); await refresh();
+    $('notice').hidden = false; $('notice').textContent = `已连接隐藏会话“${result.title}”。请在此会话完成 DevSpace 插件配对，然后开启自动派发。`;
+  } finally { $('bind-hidden').disabled = false; }
+}));
 $('settings-button').addEventListener('click', () => { if (!state) return; fillSettings(); showSetup(true); });
 $('begin-button').addEventListener('click', () => { showSetup(false); render(); detail().catch(notice); });
-$('pair-button').addEventListener('click', safe(async () => { const result = await api('/api/plugins/ticket', {}); showText('发给已启用插件的 GPT', result.prompt, '口令十分钟内有效，只能使用一次。请让 GPT 实际执行回连命令。'); }));
+$('pair-button').addEventListener('click', safe(async () => { const result = await api('/api/plugins/ticket', {}); showText('发给已启用插件的 GPT', result.prompt, '口令十分钟内有效，只能使用一次。桌面模式请在已选的专用会话中配对，完成后保持归档。请让 GPT 实际执行回连命令。'); }));
 $('reset-pair').addEventListener('click', safe(async () => { await api('/api/plugins/reset', {}); await refresh(); }));
 $('probe-button').addEventListener('click', safe(async () => {
   const token = $('mcp-bearer').value; $('mcp-bearer').value = '';
@@ -84,7 +128,7 @@ $('probe-button').addEventListener('click', safe(async () => {
 }));
 $('client-config').addEventListener('click', safe(async () => { const result = await api('/api/config/client'); showText('通用 MCP 客户端配置', JSON.stringify(result, null, 2), '合并到你客户端的 MCP 配置。此连接器提供任务管理；文件和命令仍使用你自己的 DevSpace 插件。'); }));
 for (const [id, enabled] of [['autostart-enable', true], ['autostart-disable', false]]) $(id).addEventListener('click', safe(async () => { await api('/api/system/autostart', { enabled }); $('notice').textContent = enabled ? '本安装的登录自启动已开启。' : '本安装的登录自启动已关闭。'; $('notice').hidden = false; }));
-function newTask() { if (!state) return; if (!state.config.workspace || !state.config.plugin?.pairedAt || state.config.plugin.compatible === false) { fillSettings(); showSetup(true); notice('请先保存项目目录并核对版本、完成 GPT 插件配对。'); return; } $('task-dialog').showModal(); }
+function newTask() { if (!state) return; if (!state.config.workspace || !state.config.plugin?.pairedAt || state.config.plugin.compatible === false || (state.config.executor.mode === 'desktop' && !state.config.executor.bound)) { fillSettings(); showSetup(true); notice('请先保存项目目录、完成所选执行方式的连接与 GPT 插件配对。'); return; } $('task-dialog').showModal(); }
 $('new-task').addEventListener('click', newTask); $('first-task').addEventListener('click', newTask);
 $('task-form').addEventListener('submit', safe(async () => { const result = await api('/api/tasks', { title: $('new-title').value, request: $('new-request').value }); selectedId = result.task.id; $('task-dialog').close(); $('task-form').reset(); showSetup(false); await refresh(); }));
 $('task-prompt').addEventListener('click', safe(async () => { const result = await api(`/api/tasks/${selectedId}/prompt`, {}); showText('任务执行口令', result.prompt, '将口令发给已完成配对的 GPT。包含本任务的执行权限，请勿公开分享。'); }));

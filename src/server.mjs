@@ -7,14 +7,16 @@ import { promisify } from 'node:util';
 import { loadConfig, appRoot, writeJson } from './config.mjs';
 import { Store, equalToken, failure } from './store.mjs';
 import { choosePlugin, discoverPlugins, probeMcp, restorePair } from './plugins.mjs';
-import { pairingPrompt, taskPrompt } from './prompts.mjs';
+import { pairingPrompt, taskPrompt, desktopConnectPrompt } from './prompts.mjs';
 import { Controller } from './controller.mjs';
+import { listHiddenExecutors, verifyHiddenExecutor } from './adapters/desktop-pipe.mjs';
 
 const version = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version;
 const staticFiles = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/favicon.svg', ['favicon.svg', 'image/svg+xml']]]);
 function publicConfig(config) {
-  const { adminToken, installationId, ...safe } = config;
-  return safe;
+  const { adminToken, installationId, executor, ...safe } = config;
+  return { ...safe, executor: { mode: executor.mode, bound: Boolean(executor.callerThreadId && executor.destinationThreadId),
+    title: executor.destinationTitle || (executor.destinationThreadId ? '已绑定的专用隐藏会话' : ''), connectedAt: executor.connectedAt || null } };
 }
 async function body(req) {
   if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw failure('请使用 JSON 请求。', 415);
@@ -26,12 +28,17 @@ function validateWorkspace(value) {
   if (typeof value !== 'string' || !isAbsolute(value) || !existsSync(value) || !statSync(value).isDirectory()) throw failure('项目目录必须是本机存在的绝对路径。', 400);
   return realpathSync(value);
 }
-export async function createServer({ dataDir, port = 17861, writeInstance = true, send } = {}) {
+export async function createServer({ dataDir, port = 17861, writeInstance = true, send, environment = process.env,
+  listExecutors = listHiddenExecutors, verifyExecutor = verifyHiddenExecutor } = {}) {
   const loaded = loadConfig(dataDir), { config } = loaded;
   if (config.plugin?.pairedAt) { config.plugin = restorePair(config.plugin); loaded.save(); }
   const store = new Store(join(loaded.dataDir, 'tasks.sqlite'));
   let url, closing = false, interval;
   const controller = new Controller({ store, config, url: () => url, ...(send ? { send } : {}) });
+  const callerContext = () => config.executor.callerThreadId || String(environment.CODEX_THREAD_ID || '').trim();
+  const idleSettings = () => {
+    if (store.hasActiveTask() || controller.busy) throw failure('请先处理当前任务或等待连接完成，再更换执行会话。');
+  };
   const json = (res, status, value) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
   const server = http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -47,6 +54,14 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
         res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store' }); return res.end(readFileSync(join(appRoot, 'public', name)));
       }
       const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
+      if (path === '/api/desktop/bootstrap' && req.method === 'POST') {
+        const input = await body(req); idleSettings();
+        store.consumeTicket(input.nonce, () => {
+          if (typeof input.callerThreadId !== 'string' || !input.callerThreadId.trim() || input.callerThreadId.length > 150) throw failure('客户端未提供有效调用上下文。', 400);
+          config.executor.callerThreadId = input.callerThreadId.trim(); loaded.save();
+        }, 'desktop');
+        return json(res, 200, { ok: true, message: '桌面调用上下文已自动连接。请回到工作台识别并选择专用隐藏会话。' });
+      }
       if (path === '/api/pair' && req.method === 'POST') {
         const input = await body(req);
         if (store.hasActiveTask()) throw failure('请先处理当前执行任务，再切换配对的插件。');
@@ -72,17 +87,41 @@ export async function createServer({ dataDir, port = 17861, writeInstance = true
       }
       if (req.method !== 'POST') throw failure('入口不存在。', 404);
       const input = await body(req);
+      if (path === '/api/desktop/ticket') {
+        idleSettings();
+        return json(res, 200, { prompt: desktopConnectPrompt(config, url, store.ticket('desktop')), expiresInSeconds: 600 });
+      }
+      if (path === '/api/desktop/list') {
+        const callerThreadId = callerContext();
+        if (!callerThreadId) return json(res, 200, { needsBootstrap: true, threads: [] });
+        if (input.cursor !== undefined && (typeof input.cursor !== 'string' || !input.cursor.trim() || input.cursor.length > 4096)) throw failure('翻页参数无效。', 400);
+        return json(res, 200, await controller.admission.run('list_hidden_executors', () => listExecutors({ callerThreadId, cursor: input.cursor })));
+      }
+      if (path === '/api/desktop/connect') {
+        idleSettings();
+        const callerThreadId = callerContext();
+        if (!callerThreadId) throw failure('请先使用自动连接口令完成桌面连接。', 400);
+        if (config.executor.mode !== 'desktop') throw failure('请先保存“桌面隐藏会话”执行方式。', 400);
+        if (typeof input.selection !== 'string' || !input.selection.trim() || input.selection.length > 150) throw failure('请选择专用隐藏会话。', 400);
+        controller.busy = true;
+        try {
+          const selected = await controller.admission.run('verify_hidden_executor', () => verifyExecutor({ callerThreadId, destinationThreadId: input.selection }));
+          if (store.hasActiveTask()) throw failure('已有任务领取执行槽，保留原会话。');
+          if (selected?.id !== input.selection) throw failure('客户端返回了不同会话，连接未保存。', 400);
+          Object.assign(config.executor, { callerThreadId, destinationThreadId: selected.id, destinationTitle: selected.title, connectedAt: new Date().toISOString() });
+          loaded.save(); return json(res, 200, { ok: true, title: selected.title });
+        } finally { controller.busy = false; }
+      }
       if (path === '/api/setup') {
+        if (controller.busy) throw failure('派发或连接正在进行，请稍后保存设置。');
         const next = {
           workspace: input.workspace ? validateWorkspace(input.workspace) : '',
           commandRuntime: ['native', 'wsl'].includes(input.commandRuntime) ? input.commandRuntime : 'native',
           modelLabel: String(input.modelLabel || '').slice(0, 100),
           autoDispatch: input.autoDispatch === true,
-          executor: { mode: input.executor?.mode === 'desktop' ? 'desktop' : 'manual',
-            callerThreadId: String(input.executor?.callerThreadId || '').trim().slice(0, 150),
-            destinationThreadId: String(input.executor?.destinationThreadId || '').trim().slice(0, 150) },
+          executor: { ...config.executor, mode: input.executor?.mode === 'desktop' ? 'desktop' : 'manual' },
         };
-        if (next.autoDispatch && (next.executor.mode !== 'desktop' || !next.executor.callerThreadId || !next.executor.destinationThreadId)) throw failure('自动派发需要完整的桌面执行器配置。', 400);
+        if (next.autoDispatch && (next.executor.mode !== 'desktop' || !next.executor.callerThreadId || !next.executor.destinationThreadId)) throw failure('请先连接专用隐藏会话，再开启自动派发。', 400);
         if (store.hasActiveTask() && (next.workspace !== config.workspace || JSON.stringify(next.executor) !== JSON.stringify(config.executor) || next.commandRuntime !== config.commandRuntime)) throw failure('请先处理当前任务，再切换项目或执行器。');
         Object.assign(config, next); loaded.save(); return json(res, 200, { config: publicConfig(config) });
       }

@@ -11,6 +11,7 @@ export class Controller {
     return { mode: this.config.executor.mode, pluginPaired: Boolean(this.config.plugin?.pairedAt) && this.config.plugin.compatible !== false,
       pluginCompatibility: this.config.plugin?.compatibility || null,
       desktopBridgeAvailable: process.platform === 'win32' && candidatePipes().length > 0,
+      hiddenExecutorBound: Boolean(this.config.executor.callerThreadId && this.config.executor.destinationThreadId),
       modelLabel: this.config.modelLabel || null, modelVerified: false, admission: this.admission.status() };
   }
   async dispatch(id) {
@@ -18,7 +19,7 @@ export class Controller {
     if (this.config.executor.mode !== 'desktop') throw new Error('当前为手动模式，请复制执行口令到已启用插件的 GPT。');
     if (!this.config.plugin?.pairedAt) throw new Error('请先完成 GPT 插件配对。');
     if (this.config.plugin.compatible === false) throw new Error('DevSpace 工具契约不兼容，请重新配对；未派发任务。');
-    if (!this.config.executor.callerThreadId || !this.config.executor.destinationThreadId) throw new Error('请先填写桌面桥接聊天配置。');
+    if (!this.config.executor.callerThreadId || !this.config.executor.destinationThreadId) throw new Error('请在连接与设置中识别并绑定专用隐藏会话，无需填写 ID。');
     if (this.admission.status().blocked) throw new Error('客户端请求正在冷却，请等待提示的重试时间。');
     this.busy = true;
     let row;
@@ -39,7 +40,7 @@ export class Controller {
   }
   async tick() {
     this.store.expire();
-    if (!this.config.autoDispatch || this.config.executor.mode !== 'desktop' || !this.config.plugin?.pairedAt || this.config.plugin.compatible === false || this.busy || Date.now() < this.nextAttempt || this.admission.status().blocked) return;
+    if (!this.config.autoDispatch || this.config.executor.mode !== 'desktop' || !this.config.executor.callerThreadId || !this.config.executor.destinationThreadId || !this.config.plugin?.pairedAt || this.config.plugin.compatible === false || this.busy || Date.now() < this.nextAttempt || this.admission.status().blocked) return;
     if (this.store.hasActiveTask()) return;
     const next = this.store.nextQueued();
     if (next) await this.dispatch(next.id).catch(() => {});

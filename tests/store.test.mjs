@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { Store } from '../src/store.mjs';
 import { temp } from './helpers.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 function fixture(t) {
   const path = join(temp('store'), 'tasks.sqlite'); let clock = 100000;
@@ -63,6 +64,16 @@ test('cross-task token and old lease cannot write progress', t => {
 test('a newly generated pairing ticket invalidates the older ticket', t => {
   const { store } = fixture(t); const old = store.ticket(), current = store.ticket();
   assert.throws(() => store.consumeTicket(old, () => true)); assert.equal(store.consumeTicket(current, () => true), true);
+});
+test('upgrading the pre-purpose ticket schema preserves existing pairing tickets', t => {
+  const path = join(temp('old-tickets'), 'tasks.sqlite'), old = new DatabaseSync(path);
+  old.exec('CREATE TABLE tickets(nonce TEXT PRIMARY KEY,expires_at INTEGER NOT NULL,consumed INTEGER NOT NULL DEFAULT 0)');
+  old.prepare('INSERT INTO tickets(nonce,expires_at) VALUES(?,?)').run('legacy-pair-ticket', 700000); old.close();
+  const store = new Store(path, { now: () => 100000 }); t.after(() => store.close());
+  assert.equal(store.consumeTicket('legacy-pair-ticket', () => 'preserved'), 'preserved');
+  const desktop = store.ticket('desktop');
+  assert.throws(() => store.consumeTicket(desktop, () => true), /用途/);
+  assert.equal(store.consumeTicket(desktop, () => true, 'desktop'), true);
 });
 test('queue admission and oldest-first selection do not depend on the dashboard history limit', t => {
   const { store, row, token } = fixture(t); store.command(row.id, token, 'claim', 'claim', {});

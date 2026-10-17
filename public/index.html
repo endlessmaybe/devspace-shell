@@ -19,8 +19,15 @@
       <form id="setup-form" class="card">
         <div class="step-heading"><span class="step">01</span><div><h2>选择项目与客户端</h2><p>填写你自己的路径，安装包不会带入任何旧用户数据。</p></div></div>
         <label>项目目录<input id="workspace" required placeholder="项目文件夹的完整路径" autocomplete="off"></label>
-        <div class="form-grid"><label>插件的命令环境<select id="command-runtime"><option value="native">Windows / Git Bash · macOS · Linux</option><option value="wsl">Windows 上的 WSL2</option></select></label><label>执行方式<select id="executor-mode"><option value="manual">通用模式：复制口令到 GPT</option><option value="desktop">桌面自动派发（兼容 Codex 管道）</option></select></label></div>
-        <div id="desktop-fields" hidden><p class="hint">此桥接依赖兼容的 Windows 桌面客户端。使用独立、已归档的 GPT 执行聊天；配置聊天 ID 是对向该聊天派发任务的授权。其他客户端可使用通用模式或下方 MCP 配置。</p><label>调用方 Codex 聊天 ID<input id="caller-id" autocomplete="off"></label><label>目标 GPT 执行聊天 ID<input id="destination-id" autocomplete="off"></label><label class="checkbox"><input type="checkbox" id="auto-dispatch"> 自动依次派发我提交的任务</label></div>
+        <div class="form-grid"><label>插件的命令环境<select id="command-runtime"><option value="native">Windows / Git Bash · macOS · Linux</option><option value="wsl">Windows 上的 WSL2</option></select></label><label>执行方式<select id="executor-mode"><option value="manual">通用模式：复制口令到 GPT</option><option value="desktop">桌面隐藏会话 · 自动派发</option></select></label></div>
+        <div id="desktop-fields" hidden>
+          <p class="hint">后台复用专用的隐藏归档 GPT 会话，不向日常聊天派发。无需查询或填写聊天 ID。先保存执行方式，再连接一次；以后重启自动复用。</p>
+          <p id="hidden-connection" role="status">尚未连接隐藏会话。</p>
+          <div class="actions"><button id="find-hidden" type="button" class="secondary">识别隐藏会话</button><button id="desktop-bootstrap" type="button" class="quiet">首次连接 / 重连桌面</button></div>
+          <div id="hidden-picker" hidden><label>选择你单独准备的 GPT 执行会话<select id="hidden-choice" aria-label="专用隐藏会话"></select></label><div class="actions"><button id="bind-hidden" type="button" class="secondary">连接所选隐藏会话</button><button id="more-hidden" type="button" class="quiet" hidden>加载更多</button></div></div>
+          <p class="hint">首次使用请在客户端新建专用 GPT 聊天，启用 DevSpace 插件后归档，再点击识别。这里的隐藏是归档，不等于临时聊天或关闭记忆；请在客户端按需设置专用会话的记忆。连接过程不读取聊天正文，不更改账号、模型或全局记忆设置。</p>
+          <label class="checkbox"><input type="checkbox" id="auto-dispatch"> 自动依次派发我提交的任务</label>
+        </div>
         <label>模型备注 <span class="muted">可选</span><input id="model-label" placeholder="例如：我在 GPT 中选择的模型" maxlength="100"></label>
         <p class="hint">模型由你在 GPT 客户端选择。备注不会替你切换模型，也不作为模型身份核验。</p>
         <button class="primary" type="submit">保存设置 <span>→</span></button>
@@ -37,7 +44,7 @@
     </section>
   </main>
 </div>
-<dialog id="task-dialog"><form id="task-form"><div class="dialog-title"><h2>新建任务</h2><button type="button" class="quiet close-dialog" aria-label="关闭">×</button></div><label>任务标题 <span class="muted">可选</span><input id="new-title" maxlength="120" placeholder="用几个字描述这件事"></label><label>你想完成什么<textarea id="new-request" required rows="7" maxlength="40000" placeholder="描述目标、范围和完成标准……"></textarea></label><p class="hint">任务会保存在本机。自动模式会派发到你配置的 GPT 执行聊天。</p><button type="submit" class="primary wide">保存任务 <span>→</span></button></form></dialog>
+<dialog id="task-dialog"><form id="task-form"><div class="dialog-title"><h2>新建任务</h2><button type="button" class="quiet close-dialog" aria-label="关闭">×</button></div><label>任务标题 <span class="muted">可选</span><input id="new-title" maxlength="120" placeholder="用几个字描述这件事"></label><label>你想完成什么<textarea id="new-request" required rows="7" maxlength="40000" placeholder="描述目标、范围和完成标准……"></textarea></label><p class="hint">任务会保存在本机。自动模式只派发到你已连接的专用隐藏会话。</p><button type="submit" class="primary wide">保存任务 <span>→</span></button></form></dialog>
 <dialog id="text-dialog"><div class="dialog-title"><h2 id="text-title">执行口令</h2><button class="quiet close-dialog" aria-label="关闭">×</button></div><p id="text-description" class="hint"></p><textarea id="text-output" readonly rows="14" aria-label="生成的内容"></textarea><div class="actions"><button id="copy-text" class="primary">复制全部内容</button><button class="secondary close-dialog">完成</button></div></dialog>
 <dialog id="confirm-dialog"><div class="dialog-title"><h2>先核实原执行器</h2></div><p id="confirm-description"></p><label class="checkbox"><input type="checkbox" id="confirm-check"> 我已停止原 GPT 执行器，并核实已发生的操作</label><div class="actions"><button id="confirm-action" class="primary">确认并继续</button><button class="secondary close-dialog">返回</button></div></dialog>
 </body></html>
