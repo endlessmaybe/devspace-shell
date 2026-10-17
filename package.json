@@ -1,0 +1,19 @@
+{
+  "name": "devspace-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable DevSpace task dashboard with capability-based plugin pairing",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=24 <27" },
+  "scripts": {
+    "start": "node scripts/manage.mjs start",
+    "stop": "node scripts/manage.mjs stop",
+    "status": "node scripts/manage.mjs status",
+    "dev": "node src/server.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "privacy": "node scripts/privacy.mjs",
+    "release": "node scripts/package.mjs"
+  }
+}

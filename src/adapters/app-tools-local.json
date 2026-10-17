@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "namespace": "codex_app",
+  "tools": ["read_thread", "list_archived_threads", "send_message_to_thread"]
+}

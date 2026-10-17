@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>DevSpace Shell</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-icon">D<span>·</span></span><span>DevSpace <strong>Shell</strong><small>你的工作，持续向前。</small></span></a>
+    <button id="new-task" class="primary wide"><span>＋</span> 新建任务</button>
+    <div class="section-label">工作空间 <span id="task-count">0</span></div>
+    <nav id="task-list" aria-label="任务列表"></nav>
+    <div class="sidebar-footer"><button id="settings-button" class="quiet">⚙ 连接与设置</button><span id="version"></span></div>
+  </aside>
+  <main>
+    <header><div><span class="eyebrow">LOCAL WORKSPACE</span><h1 id="page-title">连接你的 DevSpace</h1></div><div class="service"><span id="service-dot" class="dot"></span><span id="service-status">正在连接</span></div></header>
+    <div id="notice" role="alert" hidden></div>
+    <section id="auth-view" class="card" hidden><h2>从启动器进入</h2><p>请双击安装目录中的「启动Dev.cmd」。启动器会打开带本机认证的控制台。</p><p>不要分享浏览器认证链接或本机配置文件。</p></section>
+    <section id="setup-view" hidden>
+      <div class="intro"><div class="intro-mark">↗</div><div><h2>让 GPT 接上你的工作台。</h2><p>三个步骤，开始一段属于你的全新工作记录。</p></div></div>
+      <form id="setup-form" class="card">
+        <div class="step-heading"><span class="step">01</span><div><h2>选择项目与客户端</h2><p>填写你自己的路径，安装包不会带入任何旧用户数据。</p></div></div>
+        <label>项目目录<input id="workspace" required placeholder="项目文件夹的完整路径" autocomplete="off"></label>
+        <div class="form-grid"><label>插件的命令环境<select id="command-runtime"><option value="native">Windows / Git Bash · macOS · Linux</option><option value="wsl">Windows 上的 WSL2</option></select></label><label>执行方式<select id="executor-mode"><option value="manual">通用模式：复制口令到 GPT</option><option value="desktop">桌面自动派发（兼容 Codex 管道）</option></select></label></div>
+        <div id="desktop-fields" hidden><p class="hint">此桥接依赖兼容的 Windows 桌面客户端。使用独立、已归档的 GPT 执行聊天；配置聊天 ID 是对向该聊天派发任务的授权。其他客户端可使用通用模式或下方 MCP 配置。</p><label>调用方 Codex 聊天 ID<input id="caller-id" autocomplete="off"></label><label>目标 GPT 执行聊天 ID<input id="destination-id" autocomplete="off"></label><label class="checkbox"><input type="checkbox" id="auto-dispatch"> 自动依次派发我提交的任务</label></div>
+        <label>模型备注 <span class="muted">可选</span><input id="model-label" placeholder="例如：我在 GPT 中选择的模型" maxlength="100"></label>
+        <p class="hint">模型由你在 GPT 客户端选择。备注不会替你切换模型，也不作为模型身份核验。</p>
+        <button class="primary" type="submit">保存设置 <span>→</span></button>
+      </form>
+      <section class="card"><div class="step-heading"><span class="step">02</span><div><h2>配对 GPT 的 DevSpace 插件</h2><p>插件名称随你取。我们核对工具能力，再用一次真实命令回连。</p></div><span id="pair-state" class="badge">尚未配对</span></div><p>先在 GPT 中安装、启用并授权 DevSpace 插件，再将配对口令发给 GPT。无需提供 GPT 密码、Cookie 或 API Key。</p><div class="actions"><button id="pair-button" class="primary">生成配对口令</button><button id="reset-pair" class="quiet">重新配对</button></div><p class="hint">需要 open_workspace、exec_command、write_stdin、apply_patch。工具名称空间和参数必须属于同一个连接器。</p></section>
+      <section class="card"><div class="step-heading"><span class="step">03</span><div><h2>检查连接，开始工作</h2><p id="ready-note">完成设置和配对后，即可提交第一个任务。</p></div></div><button id="begin-button" class="primary">进入工作台 <span>→</span></button><details><summary>高级：本机 MCP 检测与其他客户端</summary><label>MCP 服务地址<input id="mcp-url" value="http://127.0.0.1:7676/mcp"></label><label>Bearer Token <span class="muted">可选，仅本次检测使用</span><input id="mcp-bearer" type="password" autocomplete="off"></label><button id="probe-button" class="secondary">只读检测工具能力</button><pre id="probe-result" hidden></pre><p class="hint">OAuth 插件可直接用上面的 GPT 配对；不要填写 DevSpace Owner 密码。检测目录成功不等于 GPT 已经启用插件。</p><button id="client-config" class="secondary">生成通用 MCP 客户端配置</button></details></section>
+      <section class="card"><h3>Windows 登录自启动</h3><p class="hint">仅管理本安装的当前用户启动项。设备登录后启动本地控制器，GPT 客户端仍需保持开启和登录。</p><div class="actions"><button id="autostart-enable" class="secondary">开启登录自启动</button><button id="autostart-disable" class="quiet">关闭登录自启动</button></div></section>
+      <p class="privacy-note">◌ 运行数据保存在此设备。发布源码或安装包不会携带你的任务和配对凭据。</p>
+    </section>
+    <section id="work-view" hidden>
+      <div class="overview"><div><span class="eyebrow">EXECUTOR</span><strong id="plugin-label">尚未配对</strong><small id="executor-note">等待设置</small></div><div><span class="eyebrow">MODEL</span><strong id="model-note">由客户端选择</strong><small>本地不冒充模型核验</small></div><div><span class="eyebrow">CONTINUITY</span><strong>自动保存检查点</strong><small>任务与租约随重启保留</small></div></div>
+      <div id="empty-state" class="empty"><span class="empty-icon">⌘</span><h2>从一个想法开始。</h2><p>提交任务，让连接好的 GPT 在你的项目里继续推进。</p><button id="first-task" class="primary">创建第一个任务</button></div>
+      <article id="task-detail" hidden><div class="task-heading"><h2 id="task-title"></h2><span id="task-state" class="badge"></span></div><p id="task-workspace" class="path"></p><section class="card"><span class="eyebrow">任务要求</span><div id="task-request" class="prose"></div></section><div id="task-warning" class="warning" hidden></div><section class="card"><div class="card-title"><h3>运行过程</h3><span class="muted">仅展示本任务记录</span></div><ol id="events"></ol></section><section id="checkpoint-card" class="card" hidden><h3>最新检查点</h3><div id="checkpoint" class="prose"></div></section><section id="result-card" class="card" hidden><h3>任务结果</h3><div id="result" class="prose"></div></section><div class="actions task-actions"><button id="task-prompt" class="primary">复制执行口令</button><button id="task-dispatch" class="secondary">派发到 GPT</button><button id="task-pause" class="quiet">暂停</button><button id="task-resume" class="quiet">恢复原任务</button><button id="task-reconcile" class="quiet">确认上次未送达</button><button id="task-cancel" class="quiet danger">取消任务</button></div></article>
+    </section>
+  </main>
+</div>
+<dialog id="task-dialog"><form id="task-form"><div class="dialog-title"><h2>新建任务</h2><button type="button" class="quiet close-dialog" aria-label="关闭">×</button></div><label>任务标题 <span class="muted">可选</span><input id="new-title" maxlength="120" placeholder="用几个字描述这件事"></label><label>你想完成什么<textarea id="new-request" required rows="7" maxlength="40000" placeholder="描述目标、范围和完成标准……"></textarea></label><p class="hint">任务会保存在本机。自动模式会派发到你配置的 GPT 执行聊天。</p><button type="submit" class="primary wide">保存任务 <span>→</span></button></form></dialog>
+<dialog id="text-dialog"><div class="dialog-title"><h2 id="text-title">执行口令</h2><button class="quiet close-dialog" aria-label="关闭">×</button></div><p id="text-description" class="hint"></p><textarea id="text-output" readonly rows="14" aria-label="生成的内容"></textarea><div class="actions"><button id="copy-text" class="primary">复制全部内容</button><button class="secondary close-dialog">完成</button></div></dialog>
+<dialog id="confirm-dialog"><div class="dialog-title"><h2>先核实原执行器</h2></div><p id="confirm-description"></p><label class="checkbox"><input type="checkbox" id="confirm-check"> 我已停止原 GPT 执行器，并核实已发生的操作</label><div class="actions"><button id="confirm-action" class="primary">确认并继续</button><button class="secondary close-dialog">返回</button></div></dialog>
+</body></html>

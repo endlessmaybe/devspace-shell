@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "devspace-shell-tasks": {
+      "command": "<absolute-path-to-node>",
+      "args": ["<absolute-path-to-devspace-shell>/src/mcp-stdio.mjs"],
+      "env": { "DEVSPACE_SHELL_DATA": "<this-user-private-data-directory>" }
+    }
+  }
+}
